@@ -21,7 +21,6 @@ from calendar import monthrange
 from datetime import date as dt_date
 from webserver import keep_alive
 
-
 # Custom file handler that limits lines to 6000
 class LimitedLinesFileHandler(logging.FileHandler):
     def __init__(self, filename, max_lines=6000, mode='a', encoding=None, delay=False):
@@ -88,8 +87,8 @@ OWNER_ID = 565110270  # Replace with the actual owner user_id
 USER_TIMEOUT = 60
 
 # Daily schedule times (IST)
-DAILY_PROMPT_TIME = "19:00"  # 7:00 PM IST - Daily activity prompt
-DEFAULT_ACTIVITY_TIME = "20:00"  # 8:00 PM IST - Default activity fallback
+DAILY_PROMPT_TIME = "00:50"  # 7:00 PM IST - Daily activity prompt
+DEFAULT_ACTIVITY_TIME = "00:51"  # 8:00 PM IST - Default activity fallback
 
 # Global month-wise main activities
 MAIN_ACTIVITIES_BY_MONTH = {
@@ -217,27 +216,8 @@ class TourDiaryBot:
                 'activities': [],
                 'custom_activities': []
             })
-            user = users_collection.find_one({'user_id': user_id})
-            message_text = (
-                "🎉 Welcome to TD Bot!"
-                
-            )
-        else:
-            hq_status = f"✅ {user['headquarters']}" if user['headquarters'] else "❌ Not set"
-            villages_count = len(user['villages'])
-            activities_count = len(user.get('custom_activities', []))
-            message_text = (
-                f"📋 **TD Bot Status**\n\n"
-                f"**Headquarters:** {hq_status}\n"
-                f"**Villages:** {villages_count} added\n"
-                f"**Custom Activities:** {activities_count} defined\n\n"
-                "Available commands:\n"
-                "/settings - Configure bot settings\n"
-                "/act - Record activity\n"
-                "/dnact - Download activities\n"
-            )
-
-        self.bot.reply_to(message, message_text, parse_mode='Markdown')
+        message_text = "🎉 Welcome to TD Bot!"
+        self.bot.reply_to(message, message_text)
 
     def handle_file_upload(self, message):
         user_id = message.from_user.id
@@ -1744,20 +1724,68 @@ class TourDiaryBot:
         def activities_cmd(message):
             self.show_activities_years(message)
 
-        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('activities_'))
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith(('activities_', 'delete_activity_', 'confirm_delete_')) or (call.data == 'cancel_selection' and hasattr(call.message, 'text') and '📅' in call.message.text))
         def activities_callback(call):
             user_id = call.from_user.id
-            if call.data == 'activities_back_years':
-                self.show_activities_years(call.message)
+            if call.data == 'cancel_selection':
+                try:
+                    self.bot.delete_message(call.message.chat.id, call.message.message_id)
+                except Exception as e:
+                    logger.error(f"Error deleting activities message: {e}")
             elif call.data.startswith('activities_year_'):
                 year = call.data.split('_')[2]
                 self.show_activities_months(call, year)
             elif call.data.startswith('activities_month_'):
                 _, _, year, month = call.data.split('_')
                 self.show_activities_dates(call, year, month)
-            elif call.data.startswith('activities_back_months_'):
-                year = call.data.split('_')[3]
-                self.show_activities_months(call, year)
+            elif call.data.startswith('delete_activity_'):
+                try:
+                    _, _, year, month, index = call.data.split('_')
+                    index = int(index)
+                    user = users_collection.find_one({'user_id': user_id})
+                    activities = user.get('activities', {})
+                    month_activities = activities.get(year, {}).get(month, [])
+                    if 0 <= index < len(month_activities):
+                        month_activities = sorted(month_activities, key=lambda a: datetime.strptime(a['date'], '%d/%m/%Y'))
+                        activity = month_activities[index]
+                        keyboard = types.InlineKeyboardMarkup(row_width=2)
+                        keyboard.add(
+                            types.InlineKeyboardButton("✅ Yes", callback_data=f"confirm_delete_{year}_{month}_{index}"),
+                            types.InlineKeyboardButton("❌ No", callback_data=f"activities_month_{year}_{month}")
+                        )
+                        msg = f"Are you sure you want to delete this activity?\n\n{activity['date']}: {activity.get('to_village','')} - {activity.get('purpose','')}\n"
+                        self.bot.edit_message_text(msg, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+                    else:
+                        self.bot.answer_callback_query(call.id, "❌ Invalid activity index")
+                except Exception as e:
+                    logger.error(f"Error preparing delete confirmation: {e}")
+                    self.bot.answer_callback_query(call.id, "❌ Error preparing delete confirmation")
+            elif call.data.startswith('confirm_delete_'):
+                try:
+                    _, _, year, month, index = call.data.split('_')
+                    index = int(index)
+                    user = users_collection.find_one({'user_id': user_id})
+                    activities = user.get('activities', {})
+                    month_activities = activities.get(year, {}).get(month, [])
+                    if 0 <= index < len(month_activities):
+                        month_activities = sorted(month_activities, key=lambda a: datetime.strptime(a['date'], '%d/%m/%Y'))
+                        deleted_activity = month_activities.pop(index)
+                        activities[year][month] = month_activities
+                        if not month_activities:
+                            del activities[year][month]
+                            if not activities[year]:
+                                del activities[year]
+                        users_collection.update_one(
+                            {'user_id': user_id},
+                            {'$set': {'activities': activities}}
+                        )
+                        self.show_activities_dates(call, year, month)
+                        self.bot.answer_callback_query(call.id, f"✅ Activity deleted: {deleted_activity['date']}")
+                    else:
+                        self.bot.answer_callback_query(call.id, "❌ Invalid activity index")
+                except Exception as e:
+                    logger.error(f"Error deleting activity: {e}")
+                    self.bot.answer_callback_query(call.id, "❌ Error deleting activity")
 
         self.callback_data = {}
 
@@ -3381,22 +3409,28 @@ class TourDiaryBot:
         for m in months:
             month_name = calendar.month_name[int(m)]
             keyboard.add(types.InlineKeyboardButton(month_name, callback_data=f"activities_month_{year}_{m}"))
-        keyboard.add(types.InlineKeyboardButton("⬅️ Back", callback_data="activities_back_years"))
+        keyboard.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_selection"))
         self.bot.edit_message_text(f"📅 Year: {year}\nSelect a month:", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
 
     def show_activities_dates(self, call, year, month):
         user_id = call.from_user.id
         user = users_collection.find_one({'user_id': user_id})
         acts = user.get('activities', {}).get(year, {}).get(month, [])
-        acts = self._sort_activities_by_date(acts)
+        acts = sorted(acts, key=lambda a: datetime.strptime(a['date'], '%d/%m/%Y'))
         if not acts:
             self.bot.edit_message_text(f"❌ No activities for {calendar.month_name[int(month)]} {year}.", call.message.chat.id, call.message.message_id)
             return
         msg = f"📅 Activities for {calendar.month_name[int(month)]} {year}:\n\n"
-        for act in acts:
-            msg += f"{act['date']}: {act.get('to_village','')} - {act.get('purpose','')}\n"
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("⬅️ Back", callback_data=f"activities_back_months_{year}"))
+        for i, act in enumerate(acts, 1):
+            msg += f"{i}. {act['date']}: {act.get('to_village','')} - {act.get('purpose','')}\n"
+        keyboard = types.InlineKeyboardMarkup(row_width=5)
+        delete_buttons = []
+        for i in range(1, len(acts) + 1):
+            delete_buttons.append(types.InlineKeyboardButton(f"🗑️ {i}", callback_data=f"delete_activity_{year}_{month}_{i-1}"))
+            if len(delete_buttons) == 5 or i == len(acts):
+                keyboard.add(*delete_buttons)
+                delete_buttons = []
+        keyboard.add(types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_selection"))
         self.bot.edit_message_text(msg, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
 
 keep_alive()
