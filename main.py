@@ -85,8 +85,8 @@ OWNER_ID = 565110270  # Replace with the actual owner user_id
 USER_TIMEOUT = 60
 
 # Daily schedule times (IST)
-DAILY_PROMPT_TIME = "00:50"  # 7:00 PM IST - Daily activity prompt
-DEFAULT_ACTIVITY_TIME = "00:51"  # 8:00 PM IST - Default activity fallback
+DAILY_PROMPT_TIME = "19:00"  # 7:00 PM IST - Daily activity prompt
+DEFAULT_ACTIVITY_TIME = "20:00"  # 8:00 PM IST - Default activity fallback
 
 # Global month-wise main activities
 MAIN_ACTIVITIES_BY_MONTH = {
