@@ -21,6 +21,7 @@ from calendar import monthrange
 from datetime import date as dt_date
 from webserver import keep_alive
 
+
 # Custom file handler that limits lines to 6000
 class LimitedLinesFileHandler(logging.FileHandler):
     def __init__(self, filename, max_lines=6000, mode='a', encoding=None, delay=False):
@@ -74,9 +75,6 @@ class LimitedLinesFileHandler(logging.FileHandler):
         super().emit(record)
 
 # Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -150,11 +148,7 @@ formatter = ISTFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# Also add console handler for immediate feedback with IST time
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+# Console handler removed to prevent duplicate logs
 
 class TourDiaryBot:
     def __init__(self):
@@ -451,7 +445,7 @@ class TourDiaryBot:
                 logger.debug(f"Using current month: {month}")
 
             logger.debug(f"MAIN_ACTIVITIES_BY_MONTH[{month}]: {MAIN_ACTIVITIES_BY_MONTH.get(month, [])}")
-            
+
             # Show purpose buttons with the correct month's default purposes
             self.show_purpose_buttons_with_custom_handler(message, temp_activity, custom_purpose_handler, month=month)
 
@@ -461,7 +455,7 @@ class TourDiaryBot:
     def show_purpose_buttons_with_custom_handler(self, message, temp_activity, custom_purpose_handler, month=None):
         """Show purpose selection buttons with numbered activities, and only register next step handler for custom purpose"""
         user_id = message.from_user.id if hasattr(message, 'from_user') else message.chat.id
-        
+
         # Get month from temp_activity date if available, otherwise use provided month or current month
         if 'date' in temp_activity:
             activity_date = datetime.strptime(temp_activity['date'], '%d/%m/%Y')
@@ -473,17 +467,17 @@ class TourDiaryBot:
         else:
             month = int(datetime.now(IST).month)
             logger.debug(f"Using current month: {month}")
-            
+
         logger.debug(f"Month value: {month} (type: {type(month)})")
-        
+
         # Get current date for display
         current_date = temp_activity.get('date', datetime.now(IST).strftime('%d/%m/%Y'))
         logger.debug(f"Using date for display: {current_date}")
-            
+
         # Get all activities for the user and month
         user_activities = self.get_user_activities(user_id, month)
         logger.debug(f"Retrieved activities for user {user_id} and month {month}: {user_activities}")
-        
+
         # Log activity information
         logger.info(f"User {user_id}: Using activities for date {current_date} (month: {calendar.month_name[month]})")
         logger.info(f"Activities for {calendar.month_name[month]}: {user_activities}")
@@ -512,7 +506,7 @@ class TourDiaryBot:
 
         # Create numbered list text
         activities_text = '\n'.join([f"{i}. {purpose}" for i, purpose in enumerate(user_activities, 1)])
-        
+
         message_text = f"🎯 **Select the purpose of visit for {current_date}**\n\n**Activities for {calendar.month_name[month]}:**\n{activities_text}\n\nClick the number button or use Manual Entry."
 
         sent = self.bot.send_message(
@@ -1243,7 +1237,7 @@ class TourDiaryBot:
     def get_user_activities(self, user_id, month=None):
         """Get custom activities for a specific user (for purpose selection)"""
         logger.debug(f"get_user_activities called with user_id: {user_id}, month: {month} (type: {type(month) if month is not None else None})")
-        
+
         # Try to find user with the given user_id
         user = users_collection.find_one({'user_id': user_id})
 
@@ -1279,7 +1273,7 @@ class TourDiaryBot:
             # Ensure month is an integer
             month = int(month)
             logger.debug(f"Using provided month: {month} (type: {type(month)})")
-        
+
         # Get main activities for the specified month
         logger.debug(f"MAIN_ACTIVITIES_BY_MONTH dictionary: {MAIN_ACTIVITIES_BY_MONTH}")
         main_activities = MAIN_ACTIVITIES_BY_MONTH.get(month, [])
@@ -1340,17 +1334,17 @@ class TourDiaryBot:
                     logger.info(f"⚠️ User {user['user_id']} has no default_purpose, selecting random activity")
                     current_month = current_time.month
                     logger.debug(f"Current month: {current_month}")
-                    
+
                     # Get activities for current month
                     month_activities = MAIN_ACTIVITIES_BY_MONTH.get(current_month, [])
                     if not month_activities:
                         month_activities = ["survey harvest", "seasonal conditions"]
                     logger.debug(f"Available activities for month {current_month}: {month_activities}")
-                    
+
                     # Select random activity
                     random_purpose = random.choice(month_activities)
                     logger.info(f"Selected random activity for user {user['user_id']}: {random_purpose}")
-                    
+
                     # Save the random purpose as default_purpose temporarily for this activity
                     user['default_purpose'] = random_purpose
 
@@ -1551,13 +1545,13 @@ class TourDiaryBot:
                     logger.info(f"User {user['user_id']} has no default_purpose at {DEFAULT_ACTIVITY_TIME}, selecting random activity")
                     current_month = current_time.month
                     logger.debug(f"Current month: {current_month}")
-                    
+
                     # Get activities for current month
                     month_activities = MAIN_ACTIVITIES_BY_MONTH.get(current_month, [])
                     if not month_activities:
                         month_activities = ["survey harvest", "seasonal conditions"]
                     logger.debug(f"Available activities for month {current_month}: {month_activities}")
-                    
+
                     # Select random activity
                     default_purpose = random.choice(month_activities)
                     logger.info(f"Selected random activity for user {user['user_id']}: {default_purpose}")
@@ -1612,7 +1606,7 @@ class TourDiaryBot:
                     if not user.get('default_purpose') else
                     f"Since you didn't record an activity by {DEFAULT_ACTIVITY_TIME}, I've added a default entry."
                 )
-                
+
                 self.bot.send_message(
                     user['user_id'],
                     f"🤖 **Default Activity Recorded**\n\n"
