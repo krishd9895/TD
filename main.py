@@ -219,19 +219,15 @@ class TourDiaryBot:
             })
             user = users_collection.find_one({'user_id': user_id})
             message_text = (
-                "🎉 Welcome to Tour Diary Bot!\n\n"
-                "To get started:\n"
-                "1. Configure your settings: /settings\n"
-                "2. Record activities: /act\n"
-                "3. Download reports: /dnact\n\n"
-                f"Daily prompts will be sent at {DAILY_PROMPT_TIME} IST!"
+                "🎉 Welcome to TD Bot!"
+                
             )
         else:
             hq_status = f"✅ {user['headquarters']}" if user['headquarters'] else "❌ Not set"
             villages_count = len(user['villages'])
             activities_count = len(user.get('custom_activities', []))
             message_text = (
-                f"📋 **Tour Diary Bot Status**\n\n"
+                f"📋 **TD Bot Status**\n\n"
                 f"**Headquarters:** {hq_status}\n"
                 f"**Villages:** {villages_count} added\n"
                 f"**Custom Activities:** {activities_count} defined\n\n"
