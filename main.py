@@ -87,8 +87,8 @@ OWNER_ID = 565110270  # Replace with the actual owner user_id
 USER_TIMEOUT = 60
 
 # Daily schedule times (IST)
-DAILY_PROMPT_TIME = "00:50"  # 7:00 PM IST - Daily activity prompt
-DEFAULT_ACTIVITY_TIME = "00:51"  # 8:00 PM IST - Default activity fallback
+DAILY_PROMPT_TIME = "19:00"  # 7:00 PM IST - Daily activity prompt
+DEFAULT_ACTIVITY_TIME = "20:00"  # 8:00 PM IST - Default activity fallback
 
 # Global month-wise main activities
 MAIN_ACTIVITIES_BY_MONTH = {
@@ -170,7 +170,7 @@ class TourDiaryBot:
 
         # Log bot startup with scheduled times
         current_time = datetime.now(IST)
-        logger.info(f"🚀 Tour Diary Bot started at {current_time.strftime('%Y-%m-%d %H:%M:%S IST')}")
+        logger.info(f"🚀 TD Bot started at {current_time.strftime('%Y-%m-%d %H:%M:%S IST')}")
         logger.info(f"📅 Scheduled times: Daily prompt at {DAILY_PROMPT_TIME} IST, Default activity at {DEFAULT_ACTIVITY_TIME} IST")
         logger.info(f"🔍 Variable values - DAILY_PROMPT_TIME: '{DAILY_PROMPT_TIME}' (type: {type(DAILY_PROMPT_TIME)})")
         logger.info(f"🔍 Variable values - DEFAULT_ACTIVITY_TIME: '{DEFAULT_ACTIVITY_TIME}' (type: {type(DEFAULT_ACTIVITY_TIME)})")
