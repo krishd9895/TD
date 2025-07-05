@@ -19,6 +19,7 @@ from openpyxl.styles import Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 from calendar import monthrange
 from datetime import date as dt_date
+from webserver import keep_alive
 
 
 # Custom file handler that limits lines to 6000
@@ -3402,6 +3403,7 @@ class TourDiaryBot:
         keyboard.add(types.InlineKeyboardButton("⬅️ Back", callback_data=f"activities_back_months_{year}"))
         self.bot.edit_message_text(msg, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
 
+keep_alive()
 if __name__ == '__main__':
     bot = TourDiaryBot()
     bot.run()
