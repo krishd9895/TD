@@ -81,7 +81,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
 DB_NAME = os.getenv('DB_NAME', 'TD')
-OWNER_ID = 565110270  # Replace with the actual owner user_id
+OWNER_ID = os.getenv('OWNER_ID') 
 USER_TIMEOUT = 60
 
 # Daily schedule times (IST)
@@ -792,7 +792,13 @@ class TourDiaryBot:
         # Delete the daily prompt message if it exists
         if user_id in self.daily_prompt_message_ids:
             try:
-                self.bot.delete_message(message.chat.id, self.daily_prompt_message_ids[user_id])
+                msg_info = self.daily_prompt_message_ids[user_id]
+                if isinstance(msg_info, dict):
+                    message_id = msg_info['message_id']
+                else:
+                    # Handle legacy format where only message_id was stored
+                    message_id = msg_info
+                self.bot.delete_message(message.chat.id, message_id)
                 logger.info(f"🗑️ Deleted daily prompt message for user {user_id}")
                 del self.daily_prompt_message_ids[user_id]
             except Exception as e:
@@ -900,7 +906,13 @@ class TourDiaryBot:
         # Delete the daily prompt message if it exists
         if user_id in self.daily_prompt_message_ids:
             try:
-                self.bot.delete_message(call.message.chat.id, self.daily_prompt_message_ids[user_id])
+                msg_info = self.daily_prompt_message_ids[user_id]
+                if isinstance(msg_info, dict):
+                    message_id = msg_info['message_id']
+                else:
+                    # Handle legacy format where only message_id was stored
+                    message_id = msg_info
+                self.bot.delete_message(call.message.chat.id, message_id)
                 logger.info(f"🗑️ Deleted daily prompt message for user {user_id}")
                 del self.daily_prompt_message_ids[user_id]
             except Exception as e:
@@ -1290,6 +1302,7 @@ class TourDiaryBot:
     def daily_prompt(self):
         """Send daily activity prompt to all users"""
         current_time = datetime.now(IST)
+        current_date = current_time.strftime('%Y-%m-%d')
         logger.info(f"🕰️ Daily prompt triggered at {current_time.strftime('%H:%M:%S IST')} (scheduled time: {DAILY_PROMPT_TIME})")
 
         if current_time.weekday() == 6:
@@ -1302,6 +1315,12 @@ class TourDiaryBot:
             if current_time.date() == second_saturday.date():
                 logger.info("📅 Second Saturday detected - skipping daily prompt (public holiday)")
                 return
+
+        # Check if daily prompt was already sent today
+        for user_id, msg_info in self.daily_prompt_message_ids.items():
+            if isinstance(msg_info, dict) and msg_info.get('date') == current_date:
+                logger.info(f"Daily prompt already sent today for user {user_id}")
+                continue
 
         users = users_collection.find({'villages': {'$exists': True, '$ne': []}})
         user_count = users_collection.count_documents({'villages': {'$exists': True, '$ne': []}})
@@ -1411,8 +1430,11 @@ class TourDiaryBot:
                     reply_markup=keyboard,
                     parse_mode='Markdown'
                 )
-                # Store the message ID for later deletion
-                self.daily_prompt_message_ids[user['user_id']] = sent_message.message_id
+                # Store the message ID and date for later deletion and duplicate prevention
+                self.daily_prompt_message_ids[user['user_id']] = {
+                    'message_id': sent_message.message_id,
+                    'date': current_time.strftime('%Y-%m-%d')
+                }
             except Exception as e:
                 logger.error(f"Error sending daily prompt to user {user['user_id']}: {e}")
 
@@ -1445,11 +1467,30 @@ class TourDiaryBot:
                 if has_activity:
                     continue
 
+                # Try to get holiday name from user's public_holidays
+                holiday_name = None
+                for h in user.get('public_holidays', []):
+                    try:
+                        if datetime.strptime(h['date'], '%d/%m/%Y').date() == current_time.date():
+                            holiday_name = h['desc']
+                            break
+                    except Exception:
+                        continue
+
+                if holiday_name:
+                    purpose_str = f"Public holiday ({holiday_name})"
+                elif current_time.weekday() == 6:
+                    purpose_str = "Public holiday (Sunday)"
+                elif current_time.weekday() == 5 and current_time.date() == second_saturday.date():
+                    purpose_str = "Public holiday (Second Saturday)"
+                else:
+                    purpose_str = "Public holiday"
+
                 activity = {
                     'date': today_str,
                     'from': user['headquarters'] or 'HQ',
                     'to_village': '',
-                    'purpose': 'Public holiday'
+                    'purpose': purpose_str
                 }
 
                 # Save using new structure
@@ -1494,12 +1535,31 @@ class TourDiaryBot:
                     if has_activity:
                         continue
 
-                    activity = {
-                        'date': today_str,
-                        'from': user['headquarters'] or 'HQ',
-                        'to_village': '',
-                        'purpose': 'Public holiday'
-                    }
+                    # Try to get holiday name from user's public_holidays
+                holiday_name = None
+                for h in user.get('public_holidays', []):
+                    try:
+                        if datetime.strptime(h['date'], '%d/%m/%Y').date() == current_time.date():
+                            holiday_name = h['desc']
+                            break
+                    except Exception:
+                        continue
+
+                if holiday_name:
+                    purpose_str = f"Public holiday ({holiday_name})"
+                elif current_time.weekday() == 6:
+                    purpose_str = "Public holiday (Sunday)"
+                elif current_time.weekday() == 5 and current_time.date() == second_saturday.date():
+                    purpose_str = "Public holiday (Second Saturday)"
+                else:
+                    purpose_str = "Public holiday"
+
+                activity = {
+                    'date': today_str,
+                    'from': user['headquarters'] or 'HQ',
+                    'to_village': '',
+                    'purpose': purpose_str
+                }
 
                     # Save using new structure
                     users_collection.update_one(
