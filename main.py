@@ -81,7 +81,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
 DB_NAME = os.getenv('DB_NAME', 'TD')
-OWNER_ID = os.getenv('OWNER_ID') 
+OWNER_ID = os.getenv('OWNER_ID') # Replace with the actual owner user_id
 USER_TIMEOUT = 60
 
 # Daily schedule times (IST)
@@ -1561,21 +1561,21 @@ class TourDiaryBot:
                     'purpose': purpose_str
                 }
 
-                    # Save using new structure
-                    users_collection.update_one(
-                        {'user_id': user['user_id']},
-                        {'$push': {f'activities.{year_str}.{month_str}': activity}}
-                    )
-                    self.bot.send_message(
-                        user['user_id'],
-                        f"🏖️ **Public Holiday Recorded**\n\n"
-                        f"Today is a public holiday (Second Saturday).\n"
-                        f"**Date:** {activity['date']}\n"
-                        f"**From:** {activity['from']}\n"
-                        f"**To:** {activity['to_village']}\n"
-                        f"**Purpose:** {activity['purpose']}\n",
-                        parse_mode='Markdown'
-                    )
+                # Save using new structure
+                users_collection.update_one(
+                    {'user_id': user['user_id']},
+                    {'$push': {f'activities.{year_str}.{month_str}': activity}}
+                )
+                self.bot.send_message(
+                    user['user_id'],
+                    f"🏖️ **Public Holiday Recorded**\n\n"
+                    f"Today is a public holiday (Second Saturday).\n"
+                    f"**Date:** {activity['date']}\n"
+                    f"**From:** {activity['from']}\n"
+                    f"**To:** {activity['to_village']}\n"
+                    f"**Purpose:** {activity['purpose']}\n",
+                    parse_mode='Markdown'
+                )
                 return
 
         # Regular weekday default activity
